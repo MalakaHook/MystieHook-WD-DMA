@@ -1,0 +1,67 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net9.0-windows</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>warnings</Nullable>
+		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+
+    <!-- Important for native DMA libs -->
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <DefaultItemExcludes>$(DefaultItemExcludes);artifacts\**</DefaultItemExcludes>
+
+    <!-- Raylib ships natives -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <ApplicationIcon>Assets\Img\Logo.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Tests\**\*.cs" />
+    <Compile Remove="WebRadar\**\*.cs" />
+    <None Update="WebRadar\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="WebRadar\test\**\*" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
+    <None Update="Start-Wardog.cmd" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="ThirdParty\Wardogs-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Assets\Maps\*.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="Assets\Maps\SOURCE.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- UI stack: raylib + ImGui bridge (rlImGui_cs brings ImGui.NET) -->
+    <PackageReference Include="Raylib-cs" Version="7.0.1" />
+    <PackageReference Include="rlImgui-cs" Version="3.2.0" />
+    <PackageReference Include="SkiaSharp" Version="3.119.1" />
+    <PackageReference Include="Svg.Skia" Version="3.2.1" />
+    <PackageReference Include="System.Drawing.Common" Version="9.0.9" />
+    <PackageReference Include="System.IO.Ports" Version="9.0.9" />
+    <PackageReference Include="System.Management" Version="9.0.9" />
+    <PackageReference Include="VmmSharpEx" Version="3.70.9417.274" />
+    <!-- DMA / VMM (your requirement) -->
+  </ItemGroup>
+	<ItemGroup>
+	  <None Include="Assets\Fonts\**\*.ttf" CopyToOutputDirectory="PreserveNewest" />
+	  <None Include="Assets\Img\**\*.png" CopyToOutputDirectory="PreserveNewest" />
+	  <None Include="Assets\Img\**\*.svg" CopyToOutputDirectory="PreserveNewest" />
+	  <None Include="Assets\Img\**\*.ico" CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Content Include="Assets\Img\Logo.ico" />
+	</ItemGroup>	
+
+  <!-- Remove Veldrid-related packages from your old file:
+       - ImGui.NET (optional; rlImGui_cs already brings it)
+       - Veldrid
+       - Veldrid.StartupUtilities
+       - Veldrid.SPIRV
+       - SDL2 runtimes section
+  -->
+
+  <!-- Pinned native runtime validated in the user's successful comparison build. -->
+  <Target Name="DmaNativeBuild" AfterTargets="Build">
+    <ItemGroup><DmaNativeFiles Include="Native\Dma\*" /></ItemGroup>
+    <Copy SourceFiles="@(DmaNativeFiles)" DestinationFolder="$(TargetDir)" />
+  </Target>
+  <Target Name="DmaNativePublish" AfterTargets="Publish">
+    <ItemGroup><DmaPublishFiles Include="Native\Dma\*" /></ItemGroup>
+    <Copy SourceFiles="@(DmaPublishFiles)" DestinationFolder="$(PublishDir)" />
+  </Target>
+</Project>

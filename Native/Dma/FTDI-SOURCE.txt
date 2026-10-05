@@ -1,0 +1,8 @@
+FTD3XX.dll and FTD3XXWU.dll source:
+https://github.com/ufrisk/LeechCore/releases/download/v2.23/LeechCore_files_and_binaries_v2.23.3-win_x64-20260820.zip
+FTD3XX.dll version 1.3.0.10, x64, valid FTDI Authenticode signature.
+FTD3XXWU.dll version 1.4.0.1, x64.
+FTD3XX.dll SHA256: 3C0FC158FD4AA604C526D58ED8274AE830D53E69E01210CC5B5FA54EC5A9B7C0
+FTD3XXWU.dll SHA256: C507CB40F188740C4A7BA3AAE4F848A305192B9B7C9E8E9264B1D66335824BFA
+These are application libraries; device drivers are installed separately on the DMA host.
+No device driver was installed or replaced by this update.

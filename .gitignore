@@ -1,0 +1,13 @@
+/.vs/
+/.vs
+/bin
+/obj
+**/bin/
+**/obj/
+/artifacts/
+
+node_modules/
+*.log
+.env
+*.user
+*.suo
