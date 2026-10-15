@@ -1,6 +1,5 @@
-# MystieHook Wardog — local source edition
+# MystieHook Wardog — 
 
-Standalone copy for server administrators. No license activation, license timer, heartbeat, map downloader, VPS configuration, or license backend is included.
 
 ## Build and launch
 

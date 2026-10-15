@@ -14,6 +14,7 @@ public sealed partial class WardogReader
         long started = Stopwatch.GetTimestamp();
         if (!Read(frame.LocalPawn+O.PlayerInventory,out ulong inventory) || !Pointer(inventory)
             || !Read(inventory+O.InventoryHeldItem,out ulong held)) return null;
+        if (held == 0 && O.InventoryActiveItem == 0) return null;
         ulong offset=held==0?O.InventoryActiveItem:O.InventoryHeldItem;
         if (!Read(inventory+offset,out ulong item) || !Pointer(item)) return null;
         byte[] identity=new byte[0x1C];

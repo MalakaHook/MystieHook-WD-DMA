@@ -1,36 +1,36 @@
 namespace MystieHook.Games.Wardog;
 
-// Ported from the current legacy Wardog project; addresses are module-relative.
+// Globals are module-relative. See Docs/Wardog-offsets-2026-10-15.md for capture coverage.
 public static class WardogOffsets
 {
-    public const ulong GNames = 0xCE81F40;
-    public const ulong GWorld = 0xD0E0E98;
-    public const ulong GObjects = 0xCF54760;
-    public const ulong NumElements = 0xCF54774;
-    public const ulong GEngine = 0xD0E4150;
-    public const ulong PlayerBaseClassIndex = 6061; // Latest ObjectsDump: WDMoverCharacter.
+    public const ulong GNames = 0xD050CC0;
+    public const ulong GWorld = 0xD2AFC08;
+    public const ulong GObjects = 0xD1234E0;
+    public const ulong NumElements = GObjects + 0x14; // Capture GUObjectArray.NumElements.
+    public const ulong GEngine = 0xD2B2EC0; // Full capture configuration; not independently rediscovered.
+    public const ulong PlayerBaseClassIndex = 6112; // Full ObjectsDump: Class WDGame.WDMoverCharacter.
     public const ulong PlayerClassObjectPointer = 0x10; // Validated FUObjectItem pointer offset.
-    public const ulong VehicleBaseClassIndex = 3650;
-    public const ulong ModularVehicleClassIndex = 3346;
+    public const ulong VehicleBaseClassIndex = 3605; // Class Mechanized.BHBaseVehiclePawn.
+    public const ulong ModularVehicleClassIndex = 3301; // Class ModularVehicles.ModularVehicle.
     public const ulong ActorClass = 0x10;
     public const ulong ActorRootComponent = 0x1C0;
     public const ulong SceneRelativeLocation = 0x168;
     public const ulong SceneRelativeRotation = 0x180;
-    public const ulong MoverMesh = 0x390;
-    public const ulong VehicleMesh = 0x750;
-    public const ulong WeaponBehaviorComponent = 0x770;
+    public const ulong MoverMesh = 0x3A0; // ABHMoverPawn: UBHSkeletalMeshComponentBudgeted*; 0x398 is the capsule.
+    public const ulong VehicleMesh = 0x760; // 2026-10-15 raw SDK: BHBaseVehiclePawn.Mesh.
+    public const ulong WeaponBehaviorComponent = 0x780; // 2026-10-15 raw SDK: WDMoverCharacter.WeaponBehaviorComponent.
     public const ulong WeaponAdsMultiplier = 0x49C;
     public const ulong WeaponAdsBaseMultiplier = 0x4A0;
     public const ulong WeaponAimingHint = 0x25C;
     public const ulong CharacterAimingAlpha = 0x81C;
-    public const ulong PlayerInventory = 0x748;
-    public const ulong InventoryHeldItem = 0x8C8;
-    public const ulong InventoryActiveItem = 0xA78; // Latest dump: ItemPendingBeginPlay; legacy fallback, not confirmed active item.
+    public const ulong PlayerInventory = 0x758; // AWDMoverCharacter: UWDPlayerInventoryComponent*.
+    public const ulong InventoryHeldItem = 0x8E0; // UWDPlayerInventoryComponent: ABHItem* held-item field.
+    public const ulong InventoryActiveItem = 0; // Disabled: former 0xA78 is a TArray, not an item pointer.
     public const ulong ItemId = 0x328; // ABHItem::ItemId, latest supplied BHItems SDK.
     public const ulong MeshComponentToWorld = 0x1D0; // Supplied 2026-10-04 mesh transform candidate; live test pending.
     public const ulong SkinnedAsset = 0x5B0;
     public const ulong SkinnedAssetSecondary = 0x5A8;
-    public const ulong SquadComponent = 0x550;
+    public const ulong SquadComponent = 0x5A8; // 2026-10-15 raw SDK: WDPlayerStateSession.SquadComponent.
     public const ulong SquadId = 0x140;
     public const ulong ControllerPlayerState = 0x2C0;
     public const ulong RawRefBoneInfo = 0x2E0;
@@ -39,22 +39,22 @@ public static class WardogOffsets
     public const ulong ControllerPawn = 0x2F8;
     public const ulong PlayerStatePawn = 0x330;
     public const ulong ControllerPawnCurrent = 0x360;
-    public const ulong PlayerStateFactionComponent = 0x548;
-    public const ulong VitalityComponent = 0x738;
+    public const ulong PlayerStateFactionComponent = 0x5A0; // 2026-10-15 raw SDK: WDPlayerStateSession.FactionComponent.
+    public const ulong VitalityComponent = 0x748; // 2026-10-15 raw SDK: WDMoverCharacter.VitalityComponent.
     public const ulong BleedoutState = 0x810;
-    public const ulong VehiclePlayerState = 0x848;
-    public const ulong StationaryVehicleFactionComponent = 0x0AC8;
-    public const ulong AirplaneVehicleFactionComponent = 0x0BA8;
-    public const ulong RotaryVehicleFactionComponent = 0x0B88;
-    public const ulong TrackedVehicleFactionComponent = 0x0BE8;
-    public const ulong WheeledVehicleFactionComponent = 0x0BD8;
+    public const ulong VehiclePlayerState = 0x890; // ABHBaseVehiclePawn: APlayerState*.
+    public const ulong StationaryVehicleFactionComponent = 0x0B18;
+    public const ulong AirplaneVehicleFactionComponent = 0x0BF8;
+    public const ulong RotaryVehicleFactionComponent = 0x0BD8;
+    public const ulong TrackedVehicleFactionComponent = 0x0C38;
+    public const ulong WheeledVehicleFactionComponent = 0x0C28;
     public const ulong SavedNetworkAddress = 0x308;
-    public const ulong PlayerName = 0x350;
+    public const ulong PlayerName = 0x350; // APlayerState FString field; 0x430 lies outside this base class.
     public const ulong SanitizedName = 0x350;
     public const ulong FactionComponentFaction = 0x128;
     public const ulong FactionComponentTag = 0x110;
     public const ulong FactionComponentTagAlt = 0x100;
-    public const ulong FactionData = 0x2C8;
+    public const ulong FactionData = 0x2D0; // AWDFaction.FactionData.
     public const ulong FactionTag = 0x30;
     public const ulong GenericTeamId = 0x108;
     public const ulong CurrentHealthHandle = 0x140;

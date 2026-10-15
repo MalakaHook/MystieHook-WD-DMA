@@ -539,7 +539,7 @@ public sealed partial class WardogReader(ulong moduleBase, WardogReader.ReadMemo
         ulong inventory = Ptr(pawn + O.PlayerInventory);
         if (inventory == 0) return "";
         ulong held = Ptr(inventory + O.InventoryHeldItem);
-        if (held == 0) held = Ptr(inventory + O.InventoryActiveItem);
+        if (held == 0 && O.InventoryActiveItem != 0) held = Ptr(inventory + O.InventoryActiveItem);
         if (held == 0) return "";
         // ABHItem::ItemId is the gameplay identity, independent of its generic class.
         if (Read(held + O.ItemId, out uint itemId) && itemId != 0)
