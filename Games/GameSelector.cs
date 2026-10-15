@@ -34,7 +34,7 @@ namespace MystieHook.Games
         private static readonly string _lastGamePath =
             System.IO.Path.Combine(AppContext.BaseDirectory, "last_game.txt");
         private static int _selectedMonitor = 0;
-        private static bool _applyBorderless = false;
+        private static bool _applyBorderless = true;
         private static bool _applyFullscreen = false;
         private static bool _undecoratedApplied = false;
         static bool _uiUseVsync = false;
@@ -597,23 +597,14 @@ namespace MystieHook.Games
                 }
             }
             ImGui.Spacing();
-            int b = UiLayout.ButtonRowAuto("Apply", "Center Window", "Restore Decorations");
-            if (b == 0)
+            if (ImGui.Button("Apply monitor"))
             {
                 Misc.ApplyMonitorSelection(_selectedMonitor, _applyBorderless, _applyFullscreen);
                 ScreenService.UpdateFromMonitor(_selectedMonitor);
             }
-            else if (b == 1)
-            {
-                Misc.CenterOnMonitor(_selectedMonitor);
-            }
-            else if (b == 2)
-            {
-                Misc.RestoreDecorations();
-            }
 
             ImGui.Separator();
-            ImGui.TextDisabled("Tip: Borderless + sizing to monitor gives a clean fullscreen feel without Alt-Tab quirks.");
+            ImGui.TextDisabled("Rendering fills the monitor and adapts to display changes. Press Windows to access the taskbar.");
         }
 
         private static bool _inputWasReady;

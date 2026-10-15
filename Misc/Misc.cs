@@ -116,53 +116,10 @@ namespace MystieHook
         }
         public static void ApplyMonitorSelection(int mon, bool borderless, bool fullscreen)
         {
-            int monCount = Raylib.GetMonitorCount();
-            if (monCount <= 0) return;
-
-            mon = Math.Clamp(mon, 0, monCount - 1);
-
-            if (fullscreen)
-            {
-                // Fullscreen path: choose monitor for fullscreen then toggle
-                if (!Raylib.IsWindowFullscreen())
-                {
-                    Raylib.SetWindowMonitor(mon);   // chooses target display for fullscreen
-                    Raylib.ToggleFullscreen();
-                }
-                else
-                {
-                    // already fullscreen: move to new monitor
-                    Raylib.ToggleFullscreen();
-                    Raylib.SetWindowMonitor(mon);
-                    Raylib.ToggleFullscreen();
-                }
-                return;
-            }
-
-            // Windowed / borderless path
-            if (Raylib.IsWindowFullscreen())
-                Raylib.ToggleFullscreen();
-
-            if (borderless)
-            {
-                Raylib.SetWindowState(ConfigFlags.UndecoratedWindow);
-                ApplyAll(); // your DWM/affinity fixes
-            }
-            else
-            {
-                Raylib.ClearWindowState(ConfigFlags.UndecoratedWindow);
-                ApplyAll();
-            }
-
-            var pos = Raylib.GetMonitorPosition(mon);
-            int w = Raylib.GetMonitorWidth(mon);
-            int h = Raylib.GetMonitorHeight(mon);
-
-            // Make it fill the chosen monitor
-            Raylib.SetWindowSize(w, h);
-            Raylib.SetWindowPosition((int)pos.X, (int)pos.Y);
+            // Legacy saved display flags no longer override full-monitor rendering.
+            Gui.FullscreenWindow.SelectMonitor(mon);
+            ApplyAll();
         }
-
         public static void CenterOnMonitor(int mon)
         {
             int monCount = Raylib.GetMonitorCount();

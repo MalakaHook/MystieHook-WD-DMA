@@ -26,6 +26,7 @@ public sealed class OverlayWindow : IDisposable
         Raylib.UnloadImage(icon);
         Win32IconHelper.SetWindowIcons("Assets/Img/Logo.ico");
         Misc.ApplyAll(); 
+        Gui.FullscreenWindow.SelectMonitor(Raylib.GetCurrentMonitor());
         Raylib.ClearWindowState(ConfigFlags.VSyncHint);
         Raylib.SetTargetFPS(_fpsCap);
 
@@ -46,6 +47,7 @@ public sealed class OverlayWindow : IDisposable
     {
         while (_running && !Raylib.WindowShouldClose())
         {
+            Gui.FullscreenWindow.Update();
             Raylib.BeginDrawing();
             Raylib.ClearBackground(Color.Black);
 

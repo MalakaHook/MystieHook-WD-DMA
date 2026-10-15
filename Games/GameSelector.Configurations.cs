@@ -37,7 +37,7 @@ public static partial class GameSelector
         (GameRegistry.Find("Wardog") as WardogGame)?.ApplyPreferences(config.Wardog);
         _selectedMonitor = Math.Clamp(config.Monitor, 0, Math.Max(0, Raylib.GetMonitorCount() - 1));
         _uiUseVsync = config.VSync; _uiFpsCap = OverlayWindow.ClampFpsCap(config.FpsCap);
-        _applyBorderless = config.Borderless; _applyFullscreen = config.Fullscreen;
+        _applyBorderless = true; _applyFullscreen = false;
         _showFps = config.ShowFps;
         _sidebarExpanded = config.SidebarExpanded;
         _previewOpen = config.VisualPreviewOpen;
