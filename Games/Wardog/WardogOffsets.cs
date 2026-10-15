@@ -49,7 +49,7 @@ public static class WardogOffsets
     public const ulong TrackedVehicleFactionComponent = 0x0C38;
     public const ulong WheeledVehicleFactionComponent = 0x0C28;
     public const ulong SavedNetworkAddress = 0x308;
-    public const ulong PlayerName = 0x350; // APlayerState FString field; 0x430 lies outside this base class.
+    public const ulong PlayerName = 0x430; // AWDPlayerState FString field; restored for live name validation.
     public const ulong SanitizedName = 0x350;
     public const ulong FactionComponentFaction = 0x128;
     public const ulong FactionComponentTag = 0x110;

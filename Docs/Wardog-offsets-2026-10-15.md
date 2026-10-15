@@ -4,7 +4,7 @@ Supersedes the partial SDK update. Source: Wardog Dump 2026-10-15-06-58-22-942-2
 
 PlayerBaseClassIndex = 6112 (0x17E0); VehicleBaseClassIndex = 3605; ModularVehicleClassIndex = 3301. These are object-table indices, not absolute class pointers.
 
-MoverMesh is 0x3A0: UBHSkeletalMeshComponentBudgeted*. 0x390 is NetworkSmoothingComponent and 0x398 is UCapsuleComponent*. PlayerInventory is 0x758; InventoryHeldItem is 0x8E0. The former active-item fallback at 0xA78 is a TArray and has been disabled in both readers. PlayerName is restored from the local override 0x430 to the base APlayerState FString at 0x350. SanitizedName remains the existing alias for that field, not a separately verified derived property.
+MoverMesh is 0x3A0: UBHSkeletalMeshComponentBudgeted*. 0x390 is NetworkSmoothingComponent and 0x398 is UCapsuleComponent*. PlayerInventory is 0x758; InventoryHeldItem is 0x8E0. The former active-item fallback at 0xA78 is a TArray and has been disabled in both readers. PlayerName is restored to the derived AWDPlayerState FString at 0x430 at user request; its displayed-name semantics await live validation. SanitizedName remains at the base APlayerState FString at 0x350 and is not used by the current player-name read.
 
 Reflected offsets establish storage location/type; obfuscated field meanings still need live validation. Native health handles, mesh transforms and bone buffers, alternate lookup candidates, and unused CharacterAimingAlpha/BleedoutState retain legacy values where this dump provides no reliable replacement. Configured globals are not independently rediscovered addresses.
 
@@ -56,7 +56,7 @@ Reflected offsets establish storage location/type; obfuscated field meanings sti
 | TrackedVehicleFactionComponent | 0x0C38 | SDK field layout: AWDTrackedVehicle._aaabhjhgblplplkpdcdkd |
 | WheeledVehicleFactionComponent | 0x0C28 | SDK field layout: AWDWheeledVehiclePawn._aaabhjhgblplplkpdcdkd |
 | SavedNetworkAddress | 0x308 | SDK field layout: APlayerState._aaabddakkdpnnfnmcdcao |
-| PlayerName | 0x350 | SDK field layout: APlayerState._aaabbddpjdbloeogieacb |
+| PlayerName | 0x430 | AWDPlayerState._aaaakbnbofjijpjaklakp (FString); user-selected name field, awaiting live validation |
 | SanitizedName | 0x350 | SDK field layout: APlayerState._aaabbddpjdbloeogieacb |
 | FactionComponentFaction | 0x128 | SDK field layout: UWDFactionComponent._aaaanlipcjeoacoemjbeg |
 | FactionComponentTag | 0x110 | SDK field layout: UWDFactionComponent._aaaakmgkkkffomhlbcekh |

@@ -11,6 +11,15 @@ public static partial class GameSelector
     private static bool _dirty;
     private static double _nextDirtyCheck;
     private static MenuTools.Option[] _searchResults=[];
+    private static string SearchTabTitle(int tab) => MenuTabs[CurrentMenuTab(tab)];
+    private static MenuTools.Option[] SearchMenuOptions(string query)
+    {
+        query = query.Trim();
+        return query.Length == 0 ? [] : MenuTools.Options.Where(o =>
+            o.Title.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || o.Help.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || SearchTabTitle(o.Tab).Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray();
+    }
     private static void MarkConfigurationSaved()
     {
         _savedSnapshot=JsonSerializer.Serialize(CaptureConfiguration());
@@ -44,15 +53,13 @@ public static partial class GameSelector
         if(_search!=_lastSearch)
         {
             _lastSearch=_search;
-            string query=_search.Trim();
-            _searchResults=query.Length==0 ? [] : MenuTools.Options.Where(o=>
-                o.Title.Contains(query,StringComparison.OrdinalIgnoreCase)||o.Help.Contains(query,StringComparison.OrdinalIgnoreCase)||MenuTabs[o.Tab].Contains(query,StringComparison.OrdinalIgnoreCase)).ToArray();
+            _searchResults=SearchMenuOptions(_search);
         }
         if(_search.Length>0)
         {
             ImGui.BeginChild("SearchResults",new(0,Math.Min(170,Math.Max(35,_searchResults.Length*26))),ImGuiChildFlags.Borders);
             foreach(var option in _searchResults)
-                if(ImGui.Selectable(MenuTabs[option.Tab]+" / "+option.Title))
+                if(ImGui.Selectable(SearchTabTitle(option.Tab)+" / "+option.Title))
                 {OpenMenuTab(option.Tab);MenuTools.FocusId=option.Section ? "" : option.Id;
                     if(option.Label=="Visual preview")_previewOpen=true;
                     _search="";break;}

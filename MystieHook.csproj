@@ -60,7 +60,7 @@
     <ItemGroup><DmaNativeFiles Include="Native\Dma\*" /></ItemGroup>
     <Copy SourceFiles="@(DmaNativeFiles)" DestinationFolder="$(TargetDir)" />
   </Target>
-  <Target Name="DmaNativePublish" AfterTargets="Publish">
+  <Target Name="DmaNativePublish" AfterTargets="Publish" Condition="'$(CompactPortable)' != 'true'">
     <ItemGroup><DmaPublishFiles Include="Native\Dma\*" /></ItemGroup>
     <Copy SourceFiles="@(DmaPublishFiles)" DestinationFolder="$(PublishDir)" />
   </Target>

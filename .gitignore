@@ -1,11 +1,10 @@
 /.vs/
 /.vs
-/bin
 /obj
-**/bin/
 **/obj/
 /artifacts/
-
+/bin/
+**/bin/
 node_modules/
 *.log
 .env

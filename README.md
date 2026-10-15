@@ -13,6 +13,13 @@ Run `bin\Release\Wardog-DMA\MystieHook.exe`, or `Start-Wardog.cmd` in that folde
 
 ## Maps: manual installation
 
+For a compact distribution, publish with `dotnet publish MystieHook.csproj -p:PublishProfile=Properties/PublishProfiles/DmaCompact.pubxml -c Release`.
+The output is `artifacts\compact-portable\Wardog-DMA\MystieHook.exe`.
+This bundles the runtime, native dependencies, Assets and WebRadar into the executable.
+On launch, .NET extracts the bundled files into its per-user cache; it needs writable temporary storage.
+DMA drivers, Node.js for web radar, and map tile packages remain separate prerequisites.
+Run `MystieHook.exe --diagnose-startup` to check assets and native libraries without opening DMA hardware.
+
 Copy the existing map package folders into `%LOCALAPPDATA%\MystieHook\Maps` on the computer running MystieHook. Preserve the existing structure:
 
 ```text
