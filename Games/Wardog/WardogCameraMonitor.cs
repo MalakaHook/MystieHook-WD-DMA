@@ -25,7 +25,7 @@ internal sealed class WardogCameraMonitor : IDisposable
         _worker = Task.Factory.StartNew(() =>
         {
             var ct = _stop.Token;
-            using var dma = new WardogDmaReader(connection, pid, ct, gate, WardogDmaPriority.Camera);
+            using var dma = new WardogDmaReader(connection, pid, ct, gate, WardogDmaPriority.Camera,WardogReadStream.Camera);
             var reader = new WardogReader(moduleBase, dma.Read);
             long previous = 0, lastSlowLog = 0;
             int failures = 0;

@@ -18,10 +18,10 @@ public sealed partial class WardogGame
 {
  private static readonly (string Category,string[] Weapons)[] RcsWeapons=
  [
-  ("Assault",["AK74M","M4","KH2002","A91","TAR21","GALIL","BUSHMASTER M17S"]),
-  ("SMG",["Vector","MP9","MP5","PP-19"]),
-  ("LMG",["M249","PKM"]),
-  ("Snipers",["SV98","MK22","Mosin","AMR 50","SCOUT RIFLE","RFB","SVDM","WEPN 030"]),
+  ("Assault",["AK74M","M4","KH2002","A91","TAR21","GALIL","BUSHMASTER M17S","TCX"]),
+  ("SMG",["Vector","MP9","MP5","PP-19","PP-BIZON"]),
+  ("LMG",["M249","PKM","EVO-3 ULTRA"]),
+  ("Snipers",["SV98","MK22","Mosin","AMR 50","SCOUT RIFLE","RFB","SVDM","WEPN 030","M14"]),
   ("Pistols",["Glock17","Judge","M1911","G18X","DEAGLE"])
  ];
  public void DrawRcs()

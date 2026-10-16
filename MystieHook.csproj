@@ -17,6 +17,12 @@
     <ApplicationIcon>Assets\Img\Logo.ico</ApplicationIcon>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <WardogReadOptimization Condition="'$(WardogReadOptimization)' == ''">true</WardogReadOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(WardogReadOptimization)' == 'true'">
+    <DefineConstants>$(DefineConstants);WARDOG_READ_OPTIMIZATION</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Tests\**\*.cs" />
     <Compile Remove="WebRadar\**\*.cs" />

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using MystieHook.Games;
+using MystieHook.Games.Wardog;
 
 namespace MystieHook.Services;
 
@@ -26,17 +27,22 @@ public static class DiagnosticsExport
         }, Options);
     }
 
-    public static Task<string> WriteAsync(JsonElement settings, SessionDiagnostics history, string directory = null)
+    public static Task<string> WriteAsync(JsonElement settings, SessionDiagnostics history, string directory = null,
+        WardogReadStatistics.Sample[] readStatistics = null)
     {
         // Copy bounded UI-owned buffers before dispatch; the worker never accesses live game/UI objects.
         var report = new
         {
             FormatVersion = 2, CreatedUtc = DateTimeOffset.UtcNow,
-            BuildVariant = "Main-FreshCamera-120Hz", DisplayPolicy = "Independent priority camera targeting 120 Hz, latest matching camera without interpolation. Player world poses use 25ms interpolation. Camera/player freshness remains 100/250ms from original acquisition. Current-scan page caching and persistent bounded scatter; original production bone reader.",
+            BuildVariant = WardogReadOptimization.Enabled ? "GitHub-ReadOptimization" : "GitHub-Baseline", DisplayPolicy = "Independent priority camera targeting 120 Hz, latest matching camera without interpolation. Player world poses use 25ms interpolation. Camera/player freshness remains 100/250ms from original acquisition. Current-scan page caching and persistent bounded scatter; original production bone reader.",
             ApplicationVersion = typeof(DiagnosticsExport).Assembly.GetName().Version?.ToString(),
             Runtime = Environment.Version.ToString(), Is64BitProcess = Environment.Is64BitProcess,
             Notes = "Local report. No raw logs, player data, license data, device identifiers, memory addresses or user paths. Samples are 100 ms buckets: peak times, minimum FPS; unavailable frames include disconnected/context-mismatched frames. Gaps mean no UI observation, not zero latency. Worker timings describe completed operations and can repeat while a worker is blocked. Native transfer time includes any internal library waits; gate wait is measured separately. Longest transfer kind belongs to the longest duration; other peaks need not be from the same cycle.",
             VmmRefresh = VmmRefreshExperiment.Current,
+#if WARDOG_READ_OPTIMIZATION
+            ReadOptimization = new { Enabled = true, Statistics = readStatistics?.ToArray() ?? [],
+                Notes = "Cumulative requested bytes/ranges and virtual page visits since attachment; not measured physical DMA throughput. p95 covers the last 1024 completed transfers per reader. Timing includes native-library work; gate wait is separate." },
+#endif
             Settings = settings, Latest = history.Latest,
             history.LastReadySeconds, history.LastPlayerSampleSeconds, history.LastCameraSampleSeconds,
             Performance = history.CopyPoints(), ConnectionEvents = history.CopyEvents(), RecentErrors = DiagnosticErrors.Snapshot()

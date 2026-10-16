@@ -13,6 +13,7 @@ public sealed partial class WardogGame : IGame
     private WardogArtillerySettings _artillery = new();
     public string Name => "Wardog";
     public bool IsAttached => _monitor.IsAttached;
+    public WardogReadStatistics.Sample[] ReadStatistics=>_monitor.ReadStatistics;
     public WardogVisualSettings PreviewVisuals => _monitor.Visuals;
     public bool PreviewEnabled => _overlay;
     private string _processName = "WardogsClient-Win64-Shipping.exe";
@@ -105,7 +106,7 @@ public sealed partial class WardogGame : IGame
                 && WardogAimSettings.Select(targetFrame,aim,(int)size.X,(int)size.Y) is System.Numerics.Vector2 target)
                 draw.AddLine(center,origin+target,aim.LineColor,1.5f);
         }
-        var display = _monitor.RenderFrame;
+        var display = _monitor.ObservedRenderFrame();
         if (_overlay && display.IsFresh) WardogOverlay.Draw(display, _monitor.Visuals);
         WardogVehicleOverlay.Draw(_monitor.Vehicles, display, _monitor.VehicleSettings);
         _monitor.Radar = WardogRadarOverlay.Draw(frame, _monitor.Vehicles, _monitor.Radar, !UiVisibility.MenusHidden);
@@ -127,7 +128,7 @@ public sealed partial class WardogGame : IGame
         if(targetMode==(int)WardogAimTarget.ClosestToMe)SafeText.Wrapped("Chooses the nearest player inside the aim FOV; equal distances favor the player closest to your crosshair.");
         SafeText.Wrapped("Locks one player per key hold. Temporary missing data pauses aim; it resumes only on that player. Release and press again to select another player.");
         MenuTools.Checkbox("Team check",ref team);
-        MenuTools.SliderFloat("Maximum distance (m)",ref distance,1,300,"%.0f");
+        MenuTools.SliderFloat("Maximum distance (m)",ref distance,1,WardogReadRange.MaximumMetres,"%.0f");
         MenuTools.SliderFloat("Aim FOV (px)",ref fov,1,600,"%.0f");MenuTools.Checkbox("Show FOV",ref fovShown);
         MenuTools.Checkbox("Target line",ref line);if(line)MenuTools.ColorEdit4("Target line color",ref color,ImGuiColorEditFlags.NoInputs);
         MenuTools.Checkbox("Show prediction", ref prediction);
@@ -136,7 +137,8 @@ public sealed partial class WardogGame : IGame
         if (prediction || aimPrediction)
         {
             var snapshot = _monitor.Current;
-            SafeText.Disabled(snapshot.IsFresh && snapshot.HasPredictionSpeed ? $"Live bullet speed: {snapshot.LocalBulletSpeed/100:0.#} m/s" : "Prediction: waiting for live bullet speed.");
+            if(ImGui.Button("Refresh bullet-speed cache"))_monitor.RefreshPredictionSpeed();
+            SafeText.Disabled(snapshot.IsFresh && snapshot.HasPredictionSpeed ? $"{(snapshot.BulletSpeedCached?"Cached":"Live")} bullet speed: {snapshot.LocalBulletSpeed/100:0.#} m/s" : snapshot.PredictionSpeedReadStatus);
             float gravity=s.BulletGravityCm,radius=s.PredictionDotRadius;bool details=s.ShowPredictionDetails;
             var dotColor=ImGui.ColorConvertU32ToFloat4(s.HeadPredictionColor);
             MenuTools.SliderFloat("Bullet gravity estimate (cm/s2)",ref gravity,0,5000,"%.0f");
@@ -198,7 +200,7 @@ public sealed partial class WardogGame : IGame
         bool show = settings.ShowVehicles, teammates = settings.ShowTeammateVehicles;
         float distance = settings.MaximumDistance;
         bool changed = MenuTools.Checkbox("Show Vehicle", ref show);
-        changed |= MenuTools.SliderFloat("Maximum distance (m)", ref distance, 0, 1000, "%.0f");
+        changed |= MenuTools.SliderFloat("Maximum distance (m)", ref distance, 0, WardogReadRange.MaximumMetres, "%.0f");
         changed |= MenuTools.Checkbox("Show teammate vehicle", ref teammates);
         if (changed) _monitor.VehicleSettings = new(show, teammates, distance);
         ImGui.TextWrapped("When teammate vehicles are hidden, vehicles with a confirmed friendly occupant are excluded. Empty vehicles and unknown occupants remain visible.");
@@ -227,6 +229,14 @@ public sealed partial class WardogGame : IGame
             SafeText.Wrapped(cs.Status);
         }
         ImGui.TextUnformatted(_monitor.RenderStatus);
+        if (WardogReadOptimization.Active)
+        {
+            ImGui.Separator();
+            SafeText.Wrapped("Read optimization | Timing samples cover the last 1024 transfers per reader.");
+            foreach (var s in _monitor.ReadStatistics)
+                SafeText.Wrapped($"{s.Stream}: requested {s.RequestedKiBPerSecond:0.0} KiB/s average | wait p95 {s.WaitP95:0.00} ms | transfer p95 {s.TransferP95:0.00} ms | max {s.LongestTransfer:0.00} ms");
+        }
+
         DrawHeldItemInspector();
         DrawFactionInspector();
     }
@@ -288,7 +298,7 @@ public sealed partial class WardogGame : IGame
         ImGui.SameLine(); ImGui.SetNextItemWidth(140);
         changed |= MenuTools.Combo("##HealthPosition", ref healthPosition, "Left\0Right\0Top\0Bottom\0");
         changed |= MenuTools.Checkbox("Show current Item in hand", ref currentItem);
-        changed |= MenuTools.SliderFloat("Maximum distance (m)", ref distance, 5, 2000);
+        changed |= MenuTools.SliderFloat("Maximum distance (m)", ref distance, 5, WardogReadRange.MaximumMetres);
         ImGui.SeparatorText("Text size");
         changed |= MenuTools.SliderFloat("Player name (px)", ref nameSize, 10, 32, "%.0f");
         changed |= MenuTools.SliderFloat("Player distance (px)", ref distanceSize, 10, 32, "%.0f");

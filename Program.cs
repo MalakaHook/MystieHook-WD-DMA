@@ -48,6 +48,14 @@ namespace MystieHook
 
         private static int Main(string[] args)
         {
+            if(args.Contains("--print-read-optimization")){Console.WriteLine(WardogReadOptimization.Enabled ? "enabled" : "disabled" );return 0;}
+            if(args.Contains("--print-lite-batching")){Console.WriteLine(WardogReadOptimization.LiteBatching ? "enabled" : "disabled");return 0;}
+            // Offline verification exits before graphics, radar, input or DMA workers start.
+            if(args.Contains("--verify-package"))
+            {
+                try { StartupDiagnostics.CheckAssets(); StartupDiagnostics.CheckNativeLibraries(); Console.WriteLine("Package dependencies verified without opening DMA."); return 0; }
+                catch(Exception ex) { Console.Error.WriteLine(ex); return 1; }
+            }
             StartupDiagnostics.Initialize();
             AppDomain.CurrentDomain.UnhandledException += (_, e) => StartupDiagnostics.Record("Unhandled exception: " + e.ExceptionObject);
             try
@@ -114,6 +122,7 @@ namespace MystieHook
             }); }
             finally
             {
+                try { GameSelector.FlushFeatureColors(); } catch { }
                 try { GameRegistry.StopActive(); } catch { }
                 LocalRadarService.StopAll();
                 try { VmmService.DisposeVmm(); } catch { }

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using VmmSharpEx;
 
 namespace MystieHook.Games.Wardog;
@@ -41,7 +41,7 @@ internal sealed class WardogVehicleMonitor
             {
                 try
                 {
-                    using var dma = new WardogDmaReader(connection, pid, token, gate, WardogDmaPriority.Vehicle);
+                    using var dma = new WardogDmaReader(connection, pid, token, gate, WardogDmaPriority.Vehicle,WardogReadStream.Vehicles);
                     var batch = new WardogReadBatch(dma.Read, dma.Scatter);
                     long now = 0, lastSlowLog = 0;
                     var reader = new WardogReader(moduleBase, batch.Read, dma.Read, () => now, batch.ScheduleNext);

@@ -20,6 +20,7 @@ public sealed partial class WardogReader
         value = default;
         if (!Pointer(address)) return false;
         Span<T> result = stackalloc T[1];
+        MarkReadOperation();
         if (!(readFresh ?? read)(address, MemoryMarshal.AsBytes(result))) return false;
         value = result[0];
         return true;

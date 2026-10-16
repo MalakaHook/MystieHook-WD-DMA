@@ -39,6 +39,7 @@ public static partial class GameSelector
         ImGui.BeginDisabled(!_dirty || _savedSnapshot.Length==0);
         if(ImGui.SmallButton("Revert##QuickConfig"))
         {
+            FlushFeatureColors();
             try
             {
                 ApplyConfiguration(JsonSerializer.Deserialize<Services.UserConfiguration>(_savedSnapshot)!);

@@ -6,6 +6,15 @@ namespace MystieHook.Games.Wardog;
 // Independent camera worker; player/vehicle scan retains its page cache.
 public sealed class WardogMonitor
 {
+    internal static WardogVisualSettings AcquisitionVisuals(WardogVisualSettings visuals,WardogAimSettings aim)
+        =>aim.Enabled||aim.ShowPrediction?visuals with {ShowHeadDot=true,ShowBones=visuals.ShowBones||aim.Bone==4,
+            ShowTeammates=visuals.ShowTeammates||!aim.TeamCheck,ShowHealth=true,HeadDotColor=null}:visuals;
+
+    internal static WardogReader.Frame FinalizeRadar(WardogReader.Frame frame,WardogVisualSettings visuals,
+        bool aimExpanded,WardogRadarSettings demand)
+        =>!aimExpanded||demand.LocalMap?frame:frame with {RadarPlayers=frame.RadarPlayers.Where(p=>
+            (visuals.ShowTeammates||p.TeamRelation!=WardogReader.Relation.Friendly)
+            &&(visuals.ShowDeadPlayers||!p.Dead)).ToArray()};
     internal readonly WardogFactionInspector FactionInspector = new();
     internal readonly WardogHeldItemInspector HeldItemInspector = new();
     private ConnectionFailureInfo _lastFailure;
@@ -25,13 +34,29 @@ public sealed class WardogMonitor
     public WardogRcsSettings Rcs {get=>Volatile.Read(ref _rcs);set=>Volatile.Write(ref _rcs,value??new());}
     private int _targetHz = 120;
     private WardogCameraMonitor _camera;
+    private WardogReadStatistics _readStatistics;
+    internal WardogReadStatistics.Sample[] ReadStatistics=>Volatile.Read(ref _readStatistics)?.Snapshot()??[];
     private readonly WardogVisualMotion _motion = new();
+    private readonly WardogRenderGapDiagnostics _renderGaps = new();
+    internal WardogReader.Frame ObservedRenderFrame()
+    {
+        if(!WardogReadOptimization.Enabled)return RenderFrame;
+        long now=Stopwatch.GetTimestamp();var camera=Camera;bool attached=IsAttached;
+        var result=_motion.SampleForCamera(now,camera,out var probe);
+        if(!attached){result=WardogReader.Frame.Empty("Detached");probe=probe with {Issues=probe.Issues|WardogVisualMotion.DisplayIssue.Detached,Drawable=false};}
+        _renderGaps.Observe(now,probe,SessionDiagnostics.Classify(Current,camera,attached,now));
+        return result;
+    }
+
+
 
     internal WardogCameraMonitor.Statistics CameraStats => Volatile.Read(ref _camera)?.Stats;
     public WardogReader.CameraFrame Camera => Volatile.Read(ref _camera)?.Current ?? WardogReader.CameraFrame.Empty;
     public WardogReader.Frame RenderFrame => IsAttached ? _motion.SampleForCamera(Stopwatch.GetTimestamp(),Camera) : WardogReader.Frame.Empty("Detached");
     public string RenderStatus => RenderFrame.IsDisplayFresh ? "Fresh camera with player snapshots" : "Camera/player data unavailable, mismatched or expired";
     private readonly WardogVehicleMonitor _vehicles = new();
+    private readonly WardogPredictionSpeedMonitor _predictionSpeed=new();
+    public void RefreshPredictionSpeed()=>_predictionSpeed.Refresh();
     private WardogVehicleSettings _vehicleSettings = new();
     private WardogRadarSettings _radar = new();
     public WardogRadarSettings Radar { get => Volatile.Read(ref _radar); set { if (value == Radar) return; Volatile.Write(ref _radar, value); UpdateVehicleNeeds(); } }
@@ -43,13 +68,13 @@ public sealed class WardogMonitor
     private WardogRadarSettings AcquisitionRadar { get { var r=Radar;return r with {
         Enabled=_mapPlayers || _webRadarDemand || (r.Enabled && r.Players), LocalMap=r.Enabled,
         Names=(r.Enabled && r.Players && r.Names) || _webRadarDemand,
-        Range=_mapPlayers || _webRadarDemand ? 30000 : r.CaptureRange,WebSharing=_webRadarDemand }; } }
+        Range=_mapPlayers || _webRadarDemand ? WardogReadRange.MaximumMetres : r.CaptureRange,WebSharing=_webRadarDemand }; } }
     private void UpdateVehicleNeeds()
     {
         var radar=Radar; var vehicles=_vehicleSettings;
         _vehicles.Settings = vehicles with { ShowVehicles=vehicles.ShowVehicles || _mapVehicles || _webRadarDemand || (radar.Enabled && radar.Vehicles),
             ShowTeammateVehicles=_webRadarDemand || (radar.Enabled && radar.Vehicles) || vehicles.ShowTeammateVehicles, CaptureTeams=_webRadarDemand || (radar.Enabled && radar.Vehicles),
-            MaximumDistance=_mapVehicles || _webRadarDemand ? 30000 : Math.Max(vehicles.ShowVehicles ? vehicles.MaximumDistance : 0, radar.Enabled && radar.Vehicles ? radar.CaptureRange : 0) };
+            MaximumDistance=_mapVehicles || _webRadarDemand ? WardogReadRange.MaximumMetres : WardogReadRange.Limit(Math.Max(vehicles.ShowVehicles ? vehicles.MaximumDistance : 0, radar.Enabled && radar.Vehicles ? radar.CaptureRange : 0)) };
     }
     public WardogReader.VehicleFrame Vehicles => _vehicles.Current;
     private int _attached;
@@ -77,6 +102,7 @@ public sealed class WardogMonitor
         _cancel = new CancellationTokenSource();
         var token = _cancel.Token;
         var gate = new WardogDmaGate();
+        Volatile.Write(ref _readStatistics,gate.Statistics);
         string process = processName.Trim();
         Volatile.Write(ref _frame, WardogReader.Frame.Empty("Connecting..."));
         Volatile.Write(ref _attached, 0);
@@ -100,10 +126,10 @@ public sealed class WardogMonitor
                 inputInitialization = MystieHook.Input.InputManager.BeginInitializeWithRetries(
                     new DmaMemory.VmmSharpExAdapter(connection), TimeSpan.FromSeconds(1), inputCancellation.Token,
                     (ready, error) => { if (ready) StartupDiagnostics.Record("InputManager ready."); });
-                using var dma = new WardogDmaReader(connection, pid, token, gate);
+                using var dma = new WardogDmaReader(connection, pid, token, gate,stream:WardogReadStream.Players);
                 var batch = new WardogFrameMemory(dma.Read, dma.Scatter);
                 long sampleNow = 0;
-                var reader = new WardogReader(moduleBase, batch.Read, dma.Read, () => sampleNow, batch.ScheduleNext, batch.Prefetch);
+                var reader = new WardogReader(moduleBase, batch.Read, dma.Read, () => sampleNow, batch.ScheduleNext, batch.Prefetch,()=>_predictionSpeed.Current,dma.Scatter,readOperation:WardogReadOptimization.Enabled?operation=>dma.Operation=operation:null);
                 var prediction = new WardogPrediction();
                 Volatile.Write(ref _camera, new WardogCameraMonitor(connection, pid, moduleBase, gate, () => Current, token));
                 using var pacer = new WardogPacer(token);
@@ -116,15 +142,17 @@ public sealed class WardogMonitor
                     { PublishFailure(ConnectionFailureKind.AttachmentChanged, "Attachment changed; reconnect to Wardog"); return; }
                     FactionInspector.EnsureStarted(connection, pid, moduleBase, gate, () => Current, token);
                     HeldItemInspector.EnsureStarted(connection, pid, moduleBase, gate, () => Current, token);
+                    _predictionSpeed.Enabled=Aim.NeedsPrediction;
+                    _predictionSpeed.EnsureStarted(connection,pid,moduleBase,gate,()=>Current,token);
                     long started = Stopwatch.GetTimestamp();
                     sampleNow = WardogReader.MonotonicMilliseconds;
                     dma.ResetMetrics();
                     batch.BeginFrame(sampleNow);
                     var captureSettings=Volatile.Read(ref _visuals);bool esp=Volatile.Read(ref _visualsEnabled);var aim=Aim;
                     bool needsAimPose = aim.Enabled || aim.ShowPrediction;
-                    if(needsAimPose) captureSettings=captureSettings with { ShowHeadDot=true, ShowBones=captureSettings.ShowBones||aim.Bone==4,
-                        ShowTeammates=true,ShowHealth=true,HeadDotColor=null };
-                    var next = reader.Capture(captureSettings, Volatile.Read(ref _aspectRatio), esp||needsAimPose, Camera, AcquisitionRadar, _detectMap || Radar.DebugNames || (Radar.Enabled && Radar.AutoMap), aim.NeedsPrediction, Rcs.Active);
+                    captureSettings=AcquisitionVisuals(captureSettings,aim);
+                    var radarDemand=AcquisitionRadar;
+                    var next = reader.Capture(captureSettings, Volatile.Read(ref _aspectRatio), esp||needsAimPose, Camera, radarDemand, _detectMap || Radar.DebugNames || (Radar.Enabled && Radar.AutoMap), aim.NeedsPrediction, Rcs.Active);
                     if (next.Valid && _vehicles.Settings.ShowVehicles && sampleNow >= nextVehicleRead)
                     {
                         nextVehicleRead = sampleNow + 50;
@@ -138,12 +166,7 @@ public sealed class WardogMonitor
                         finally { dma.Priority = WardogDmaPriority.Player; }
                     }
                     else if (!next.Valid || !_vehicles.Settings.ShowVehicles) _vehicles.Publish(WardogReader.VehicleFrame.Empty);
-                    if(needsAimPose)
-                    {
-                        var visualFilters=Volatile.Read(ref _visuals);
-                        next=next with { RadarPlayers=next.RadarPlayers.Where(p=>(visualFilters.ShowTeammates || p.TeamRelation!=WardogReader.Relation.Friendly)
-                            && (visualFilters.ShowDeadPlayers || !p.Dead)).ToArray() };
-                    }
+                    next=FinalizeRadar(next,Volatile.Read(ref _visuals),needsAimPose,radarDemand);
                     batch.EndFrame();
                     token.ThrowIfCancellationRequested();
                     if (next.Valid) invalidSince = 0;
@@ -177,7 +200,26 @@ public sealed class WardogMonitor
                         lastLog = sampleNow;
                         StartupDiagnostics.Record("Skeleton sources: " + reader.DescribeSkeletons());
                         var cs = CameraStats;
-                        StartupDiagnostics.Record($"Reader: players={next.Players.Length}; valid={next.Valid}; read={elapsed:0.0}ms; dma={dma.TransferMilliseconds:0.0}ms; wait={dma.WaitMilliseconds:0.0}ms; calls={dma.Operations}; slowest={dma.LongestTransferKind}/{dma.LongestTransferMilliseconds:0.0}ms; poseFailures={next.PoseFailures}; poseFallbacks={next.PoseFallbacks}; cameraRead={cs?.ReadMs:0.0}ms; cameraWait={cs?.WaitMs:0.0}ms; render={RenderStatus}; status={next.Status}");
+                        StartupDiagnostics.Record($"Reader: players={next.Players.Length}; valid={next.Valid}; read={elapsed:0.0}ms; dma={dma.TransferMilliseconds:0.0}ms; wait={dma.WaitMilliseconds:0.0}ms; calls={dma.Operations}; slowest={dma.LongestTransferKind}/{dma.LongestTransferMilliseconds:0.0}ms; operation={dma.LongestTransferOperation}; poseFailures={next.PoseFailures}; poseFallbacks={next.PoseFallbacks}; cameraRead={cs?.ReadMs:0.0}ms; cameraWait={cs?.WaitMs:0.0}ms; render={RenderStatus}; status={next.Status}");
+                        if (WardogReadOptimization.Active)
+                        {
+                            StartupDiagnostics.Record($"Read optimization: pageHits={batch.CacheHits}; newPageBuffers={batch.NewPageBuffers}; retainedPageBuffers={batch.RetainedPageBuffers}");
+                            foreach (var s in ReadStatistics)
+                                StartupDiagnostics.Record($"Read totals {s.Stream}: transfers={s.Transfers}; ranges={s.Ranges}; requestedBytes={s.RequestedBytes}; virtualPageVisits={s.VirtualPageVisits}; p95Wait={s.WaitP95:0.00}ms; p95Transfer={s.TransferP95:0.00}ms; maxTransfer={s.LongestTransfer:0.00}ms");
+                            // Drain on the existing diagnostics cadence, never write files
+                            // on the camera worker or while holding the DMA lease.
+                            var waits = gate.DrainCameraContentions();
+                            var gaps = _renderGaps.Drain();
+                            foreach(var gap in gaps.OrderByDescending(g=>g.Frames).Take(4))
+                                StartupDiagnostics.Record(WardogRenderGapDiagnostics.Describe(gap,Stopwatch.GetTimestamp()));
+                            if(gaps.Length>4)StartupDiagnostics.Record($"Render gap summary: retained={gaps.Length}; additional={gaps.Length-4}");
+                            if (waits.Length != 0)
+                            {
+                                var blocked = waits.MaxBy(w => w.WaitMs);
+                                StartupDiagnostics.Record(FormattableString.Invariant(
+                                    $"Camera DMA contention: retainedEvents={waits.Length}; startedAgo={Stopwatch.GetElapsedTime(blocked.WaitStarted).TotalMilliseconds:0.0}ms; wait={blocked.WaitMs:0.0}ms; gateOccupied={blocked.OccupiedMs:0.0}ms; blockers={blocked.BlockingTransfers}; longest={blocked.LongestBlocker.Stream}/{blocked.LongestBlocker.Kind}; operation={blocked.LongestBlocker.Operation}; ranges={blocked.LongestBlocker.Ranges}; requestedBytes={blocked.LongestBlocker.Bytes}; overlap={blocked.LongestOverlapMs:0.0}ms; blockerGateHold={blocked.BlockerHoldMs:0.0}ms"));
+                            }
+                        }
                     }
                     if (next.Valid) pacer.WaitNext(started, Volatile.Read(ref _targetHz));
                     else
@@ -197,6 +239,7 @@ public sealed class WardogMonitor
                 _vehicles.StopAndWait();
                 FactionInspector.StopAndWait();
                 HeldItemInspector.StopAndWait();
+                _predictionSpeed.StopAndWait();
                 Interlocked.Exchange(ref _camera, null)?.Dispose();
                 inputCancellation.Cancel();
                 try { inputInitialization.GetAwaiter().GetResult(); } catch { }

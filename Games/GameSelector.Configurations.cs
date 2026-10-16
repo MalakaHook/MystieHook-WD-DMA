@@ -93,6 +93,7 @@ public static partial class GameSelector
 
     private static void ApplyChosenConfiguration()
     {
+        FlushFeatureColors();
         try
         {
             var config = Configurations.Load(_chosenConfig);
@@ -108,6 +109,7 @@ public static partial class GameSelector
 
     private static void SaveCurrentConfiguration()
     {
+        FlushFeatureColors();
         try
         {
             Configurations.Save(_currentConfig, CaptureConfiguration());
@@ -136,6 +138,7 @@ public static partial class GameSelector
         ImGui.InputText("New config name", ref _newConfigName, 81);
         if (ImGui.Button("Create from current"))
         {
+            FlushFeatureColors();
             try
             {
                 var name = _newConfigName.Trim();

@@ -52,6 +52,7 @@ public sealed partial class WardogReader
         if (header == 0 || !Read(header, out array) || !Pointer(array.Data)
             || array.Count < 16 || array.Count > 1024 || array.Capacity < array.Count || array.Capacity > 4096) return false;
         infos = new BoneInfo[array.Count];
+        MarkReadOperation();
         if (!read(array.Data, MemoryMarshal.AsBytes(infos.AsSpan()))) return false;
         // Parent-before-child excludes cycles and unrelated arrays.
         return infos.Select((v,i) => v.Parent >= -1 && v.Parent < i).All(v => v);

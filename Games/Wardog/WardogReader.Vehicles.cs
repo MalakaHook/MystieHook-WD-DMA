@@ -118,7 +118,7 @@ public sealed partial class WardogReader
             _occupantLocalTeam = localState == 0 ? default : ReadTeam(localState);
             _occupants[0] = new(OccupiedSeat(context.LocalPawn), true, _now);
         }
-        // Occupancy is independent of player ESP, range and on-screen filtering.
+        // Occupancy is independent of ESP and visibility, with the shared 1000m detail cap.
         int budget = 16, visited = 0;
         while (_occupantStates.Length > 0 && budget > 0 && visited++ < _occupantStates.Length)
         {
@@ -128,6 +128,8 @@ public sealed partial class WardogReader
             if (_occupants.TryGetValue(state, out var prior) && _now - prior.ReadAt < 500) continue;
             budget--;
             ulong pawn = Ptr(state + O.PlayerStatePawn);
+            if(pawn!=context.LocalPawn&&(pawn==0||!Position(pawn,out var position)||!WardogReadRange.Contains(position,context.LocalPosition)))
+            {_occupants[state]=new(0,false,_now);continue;}
             ulong seat = pawn == 0 ? 0 : OccupiedSeat(pawn);
             bool friendly = seat != 0 && (pawn == context.LocalPawn || CompareTeams(_occupantLocalTeam, ReadTeam(state)) == Relation.Friendly);
             _occupants[state] = new(seat, friendly, _now);
@@ -173,7 +175,7 @@ public sealed partial class WardogReader
         _actorCursor += count; _scanTotal += count;
         var validActors = actors.Where(Pointer).Distinct().ToArray();
         var addresses = validActors.Select(a => a + O.UObjectClass).ToArray();
-        ulong[] classes = readPointers != null ? readPointers(addresses) : addresses.Select(Ptr).ToArray();
+        ulong[] classes = readPointers != null ? readPointers(addresses) : addresses.Select(address=>Ptr(address)).ToArray();
         for (int i = 0; i < Math.Min(classes.Length, validActors.Length); i++)
             if (VehicleType(classes[i]) && _foundVehicles.Count < 512)
             {
@@ -217,7 +219,9 @@ public sealed partial class WardogReader
         foreach (var (actor, type) in _vehicleActors)
         {
             if (Ptr(actor + O.UObjectClass) != type || !Position(actor, out var position)
-                || position.Distance(context.LocalPosition) / 100 > settings.MaximumDistance) continue;
+                || !WardogReadRange.Contains(position,context.LocalPosition)
+                || position.Distance(context.LocalPosition) / 100 > settings.MaximumDistance)
+            {_vehicleMeshes.Remove(actor);_vehicleIdentities.Remove(actor);_nextVehicleMeshRead.Remove(actor);continue;}
             var relation=Relation.Unknown;
             if (!settings.ShowTeammateVehicles || settings.CaptureTeams)
             {
@@ -324,7 +328,9 @@ public sealed partial class WardogReader
         "SK_WHL_07" => "Ural",
         "SK_WHL_07_Battle" => "Ural Defender",
         "SK_TNK_02" => "SPH-2",
-        "SK_TNK_Base" => "Tank L2A6",
+        "SK_TNK_Base" => "FLAKPANZER GEPARD AA",
+        "SK_TNK_04" => "T-72",
+        "SK_WHL_08_MG" => "WOLF-110",
         "SK_ROT_03" => "MH6 Littlebird",
         "SK_ROT_04" => "Z20 Lakota",
         "SK_ROT_02" => "Havoc",

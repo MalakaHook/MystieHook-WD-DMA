@@ -11,7 +11,9 @@ public static class WardogWeaponTable
         ["Id.Item.SR_04"]="AMR 50", ["Id.Item.Judge"]="Judge",
         ["Id.Item.WEPN_026"]="M1911", ["Id.Item.WEPN_032"]="G18X",
         ["Id.Item.WEPN_027"]="DEAGLE", ["Id.Item.Launcher_04"]="VERBA ANTI-AIR",
-        ["Id.Item.CGM4"]="MAAWS"
+        ["Id.Item.CGM4"]="MAAWS",
+        ["Id.Item.WEPN_037"]="TCX", ["Id.Item.WEPN_031"]="PP-BIZON",
+        ["Id.Item.WEPN_036"]="EVO-3 ULTRA", ["Id.Item.WEPN_034"]="M14"
     };
     public static string HeldItemLabel(string identity)
     {

@@ -151,10 +151,12 @@ public static class MenuTools
         if(After(label,true)){value=(int)Lookup[(Tab,label)].Default;changed=true;}
         return changed;
     }
+    public static long ColorRevision {get;private set;}
     public static bool ColorEdit4(string label,ref Vector4 value,ImGuiColorEditFlags flags=ImGuiColorEditFlags.None)
     {
         bool changed=ImGui.ColorEdit4(label,ref value,flags);
         if(After(label,true)){value=ImGui.ColorConvertU32ToFloat4((uint)Lookup[(Tab,label)].Default);changed=true;}
+        if(changed)ColorRevision++;
         return changed;
     }
     public static bool InputInt(string label,ref int value)

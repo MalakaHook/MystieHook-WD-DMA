@@ -143,6 +143,7 @@ public sealed partial class WardogReader
         if (length <= 0 || length > 512) return "";
         bool wide = (header & 1) != 0;
         byte[] bytes = new byte[length * (wide ? 2 : 1)];
+        MarkReadOperation();
         if (!read(entry + layout.Data, bytes)) return "";
         string name = (wide ? Encoding.Unicode : Encoding.UTF8).GetString(bytes);
         return name.Any(char.IsControl) || name.Contains('\uFFFD') ? "" : name;
@@ -209,6 +210,7 @@ public sealed partial class WardogReader
                 && current.Count >= 16 && current.Count <= 1024 && current.Capacity >= current.Count)
             {
                 var infos = new BoneInfo[current.Count];
+                MarkReadOperation();
                 if (read(current.Data, MemoryMarshal.AsBytes(infos.AsSpan()))
                     && infos.Select((info, index) => info.Parent < index && info.Parent >= -1).All(valid => valid))
                 {
@@ -280,6 +282,7 @@ public sealed partial class WardogReader
             if (map==null && array.Count<149) continue;
             var points=new Vec[22]; var valid=new bool[22];
             var selected=map==null ? FallbackBones : map.Selected;
+            PrefetchSelectedBones(array,selected,map,offset,full,boundsOnly);
             var transforms=new Dictionary<int,Transform>();
             bool Get(int index,out Transform transform)
             {

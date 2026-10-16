@@ -25,7 +25,8 @@ public static partial class GameSelector
         if (ImGui.Button(_diagnosticExport == null ? "Export diagnostics" : "Exporting..."))
         {
             _diagnosticError = "";
-            try { _diagnosticExport = DiagnosticsExport.WriteAsync(DiagnosticsExport.CaptureSettings(CaptureConfiguration()), game.Diagnostics); }
+            try { _diagnosticExport = DiagnosticsExport.WriteAsync(DiagnosticsExport.CaptureSettings(CaptureConfiguration()), game.Diagnostics,
+                readStatistics: WardogReadOptimization.Enabled ? game.ReadStatistics : null); }
             catch { _diagnosticError = "Could not capture diagnostics settings. Please retry."; }
         }
         ImGui.EndDisabled();

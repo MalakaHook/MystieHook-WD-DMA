@@ -8,14 +8,50 @@ namespace MystieHook.Games.Wardog;
 // Render-only reference history; original acquisition timestamps remain untouched.
 public sealed class WardogVisualMotion
 {
+    [Flags]
+    public enum DisplayIssue { None=0, NoPlayerFrame=1, DisplayExpired=2, FutureCompletion=4,
+        PlayersStale=8, CameraUnavailable=16, CameraStale=32, ContextMismatch=64, GateBoundary=128, Detached=256 }
+    public readonly record struct DisplayProbe(DisplayIssue Issues, bool Drawable,
+        double? PlayerAgeMs, double? CompletionAgeMs, double? CameraAgeMs, bool UsedRawFallback=false);
     private readonly object _sync = new();
     private F[] _samples = [];
     private static double Age(long from,long to) => (to-from)/(double)Stopwatch.Frequency;
     public void Clear() { lock(_sync) _samples=[]; }
     // Interpolate world-space actors only. View rotation/translation/FOV must come
     // from the newest independent camera, with original camera/player age gates.
-    public F SampleForCamera(long now, WardogReader.CameraFrame camera, bool smooth=true) =>
-        WardogReader.WithCamera(Sample(now,smooth),camera);
+    public F SampleForCamera(long now, WardogReader.CameraFrame camera, bool smooth=true,
+        bool freshFallback=WardogReadOptimization.Enabled) =>
+        SampleForCamera(now,camera,out _,smooth,freshFallback);
+    public F SampleForCamera(long now, WardogReader.CameraFrame camera, out DisplayProbe probe, bool smooth=true,
+        bool freshFallback=WardogReadOptimization.Enabled)
+    {
+        var sample=SampleCore(now,smooth,.025,out probe,out var raw);
+        bool fallback=false;
+        // Only completion-based display expiry can take this path. Use the
+        // same immutable history snapshot, never revive cleared/changed history.
+        // Acquisition time remains the authority; no display extension or stamp renewal.
+        if(freshFallback && probe.Issues==DisplayIssue.DisplayExpired && raw is {Valid:true}
+            &&raw.SampleStarted>0&&raw.CompletedAt>=raw.SampleStarted
+            &&Age(raw.SampleStarted,now)>=0&&Age(raw.SampleStarted,now)<.25
+            &&camera.SampleStarted>0&&Age(camera.SampleStarted,now)>=0&&Age(camera.SampleStarted,now)<.1
+            &&camera.World!=0&&camera.Controller!=0&&camera.World==raw.WorldAddress&&camera.Controller==raw.LocalController)
+        {
+            sample=raw with {DisplayUntil=0};fallback=true;
+            probe=probe with {Issues=DisplayIssue.None};
+        }
+        var issues=probe.Issues;
+        if(sample.Valid && (sample.SampleStarted==0 || Age(sample.SampleStarted,now)>=.25))issues|=DisplayIssue.PlayersStale;
+        if(camera.World==0||camera.Controller==0||camera.SampleStarted==0)issues|=DisplayIssue.CameraUnavailable;
+        else if(Age(camera.SampleStarted,now)>=.1)issues|=DisplayIssue.CameraStale;
+        if(sample.Valid && camera.World!=0 && camera.Controller!=0
+            && (sample.WorldAddress!=camera.World||sample.LocalController!=camera.Controller))issues|=DisplayIssue.ContextMismatch;
+        var result=WardogReader.WithCamera(sample,camera);
+        bool drawable=result.IsFresh;
+        if(!drawable && issues==DisplayIssue.None)issues=DisplayIssue.GateBoundary;
+        probe=probe with {Issues=issues,Drawable=drawable,UsedRawFallback=fallback&&drawable,
+            CameraAgeMs=camera.SampleStarted==0?null:Age(camera.SampleStarted,now)*1000};
+        return result;
+    }
     public void Push(F frame)
     {
         lock(_sync)
@@ -31,10 +67,17 @@ public sealed class WardogVisualMotion
         }
     }
     public F Sample(long now,bool smooth=true,double delay=.025)
+        =>SampleCore(now,smooth,delay,out _,out _);
+    private F SampleCore(long now,bool smooth,double delay,out DisplayProbe probe,out F raw)
     {
         F[] samples;lock(_sync) samples=_samples;
+        raw=null;
+        probe=new(DisplayIssue.NoPlayerFrame,false,null,null,null);
         if(samples.Length==0)return F.Empty("No player frame");
-        var latest=samples[^1];double retention=smooth?.15:.5;
+        var latest=samples[^1];raw=latest;double retention=smooth?.15:.5;
+        double completedAge=Age(latest.CompletedAt,now);
+        probe=new(completedAge<0?DisplayIssue.FutureCompletion:completedAge>retention?DisplayIssue.DisplayExpired:DisplayIssue.None,
+            false,latest.SampleStarted==0?null:Age(latest.SampleStarted,now)*1000,completedAge*1000,null);
         if(Age(latest.CompletedAt,now)<0 || Age(latest.CompletedAt,now)>retention)return F.Empty("Player display expired");
         var result=latest with {DisplayUntil=latest.CompletedAt+(long)(retention*Stopwatch.Frequency)};
         if(!smooth || delay<=0 || samples.Length<2)return result;

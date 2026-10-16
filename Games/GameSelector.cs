@@ -94,6 +94,7 @@ namespace MystieHook.Games
             if (GameRegistry.Active is Wardog.WardogGame wardog) wardog.DrawOverlay();
             if (GameRegistry.Active is Example.ExampleGame) Example.ExampleGame.DrawEntitiesOverlay();
             if (!_allMenusHidden) DrawUnifiedMenu();
+            ProcessColorAutosave();
             if (_showFps) DrawFps();
             ProcessLocalKeybinds();
             ExecuteKeybindsFrame();

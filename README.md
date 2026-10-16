@@ -11,6 +11,14 @@ dotnet publish MystieHook.csproj -p:PublishProfile=Properties/PublishProfiles/Dm
 
 Run `bin\Release\Wardog-DMA\MystieHook.exe`, or `Start-Wardog.cmd` in that folder for troubleshooting. Copy the **whole published folder**, including Assets, WebRadar, and native libraries. Launch goes directly into the application. The published .NET runtime is self-contained; Node.js remains a separate prerequisite for web radar only.
 
+## Read optimization
+
+Read optimizations are enabled in both publish profiles: filtered bone reads,
+fresh reusable page buffers, smaller background batches and a shared 1,000 m
+detail cutoff. Settings and exported diagnostics include per-reader timings.
+See [Read optimization](Docs/Read-Optimization.md) for validation and comparison
+instructions. The existing 100/250 ms camera/player freshness limits remain.
+
 ## Maps: manual installation
 
 For a compact distribution, publish with `dotnet publish MystieHook.csproj -p:PublishProfile=Properties/PublishProfiles/DmaCompact.pubxml -c Release`.

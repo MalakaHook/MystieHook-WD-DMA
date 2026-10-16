@@ -13,7 +13,7 @@ public sealed record WardogRadarSettings(bool Enabled=false, bool HeadingUp=true
     public float Zoom { get; init; } = 16;
     public WardogRadarSettings ApplyDetectedMap(WardogReader.Frame frame) => AutoMap && WardogArtillerySettings.HasDetectedMap(frame)
         ? this with {Map=frame.DetectedMap} : this;
-    public float CaptureRange => (float)Math.Min(30000,WardogArtilleryData.ImageBounds(WardogArtilleryData.Maps[Map]).Size/100/Zoom);
+    public float CaptureRange => (float)Math.Min(WardogReadRange.MaximumMetres,WardogArtilleryData.ImageBounds(WardogArtilleryData.Maps[Map]).Size/100/Zoom);
     public bool Valid => float.IsFinite(Range) && Range is >=10 and <=10000
         && Map is >=0 and <=2 && float.IsFinite(Zoom) && Zoom is >=1 and <=128
         && float.IsFinite(Size) && Size is >=180 and <=700

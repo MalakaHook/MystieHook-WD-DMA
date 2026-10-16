@@ -3,6 +3,8 @@ namespace MystieHook.Games.Wardog;
 // Globals are module-relative. See Docs/Wardog-offsets-2026-10-15.md for capture coverage.
 public static class WardogOffsets
 {
+    public const int WeaponComponentClassIndex=5882, RangedWeaponExtensionClassIndex=6001;
+    public const ulong RangedExtensionWeaponComponent=0x128;
     public const ulong GNames = 0xD050CC0;
     public const ulong GWorld = 0xD2AFC08;
     public const ulong GObjects = 0xD1234E0;

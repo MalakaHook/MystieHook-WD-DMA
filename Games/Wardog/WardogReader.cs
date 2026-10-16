@@ -1,6 +1,7 @@
 using System.Numerics;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using System.Text;
 using O = MystieHook.Games.Wardog.WardogOffsets;
 
@@ -9,7 +10,12 @@ namespace MystieHook.Games.Wardog;
 // Core reading path adapted from legacy Reader.h. See ThirdParty/Wardogs-LICENSE.txt.
 public sealed partial class WardogReader(ulong moduleBase, WardogReader.ReadMemory read, WardogReader.ReadMemory readFresh = null,
     Func<long> clockMilliseconds = null, Action<long> scheduleRead = null,
-    Action<IEnumerable<WardogFrameMemory.Range>> prefetch = null)
+    Action<IEnumerable<WardogFrameMemory.Range>> prefetch = null,
+    Func<WardogReader.PredictionSpeedSample> predictionSpeed = null,
+    Action<IReadOnlyCollection<WardogReadBatch.Request>> verifyScatter = null,
+    Func<ulong,int,long> readSampleStarted = null,
+    bool optimizedReads = WardogReadOptimization.Enabled,
+    Action<WardogReadOperation> readOperation = null)
 {
     public delegate bool ReadMemory(ulong address, Span<byte> destination);
     internal static long MonotonicMilliseconds => (long)(Stopwatch.GetTimestamp() * (1000.0 / Stopwatch.Frequency));
@@ -39,6 +45,7 @@ public sealed partial class WardogReader(ulong moduleBase, WardogReader.ReadMemo
     private long _now;
     private ulong _playerClass;
     private readonly Dictionary<ulong, bool> _classes = new();
+    private bool _focusedPlayerReads;
     public enum Relation { Unknown, Friendly, Enemy }
     [StructLayout(LayoutKind.Sequential)]
     public struct Vec
@@ -98,8 +105,17 @@ public sealed partial class WardogReader(ulong moduleBase, WardogReader.ReadMemo
         public string LocalFaction {get;init;}="Unknown";
         public float LocalBulletSpeed { get; init; }
         public long BulletSpeedSampleStarted { get; init; }
+        public bool BulletSpeedCached {get;init;}
+        public string PredictionSpeedReadStatus { get; init; } = "Waiting for live bullet speed";
+        public string PredictionSpeedBlockReason => !float.IsFinite(LocalBulletSpeed) || LocalBulletSpeed is <2000 or >200000
+            ? PredictionSpeedReadStatus
+            : BulletSpeedSampleStarted == 0 ? "Bullet-speed sample timestamp unavailable"
+            : Stopwatch.GetElapsedTime(BulletSpeedSampleStarted).TotalMilliseconds < 0 ? "Bullet-speed sample timestamp is in the future"
+            : !HasPredictionSpeed ? BulletSpeedCached ? "Player snapshot is stale for cached weapon speed" : "Live bullet-speed sample is older than 150 ms"
+            : BulletSpeedCached ? "Cached weapon bullet speed ready" : "Live bullet speed ready";
         public bool HasPredictionSpeed => float.IsFinite(LocalBulletSpeed) && LocalBulletSpeed is >=2000 and <=200000
-            && BulletSpeedSampleStarted != 0 && Stopwatch.GetElapsedTime(BulletSpeedSampleStarted).TotalMilliseconds is >=0 and <=150;
+            && BulletSpeedSampleStarted != 0 && Stopwatch.GetElapsedTime(BulletSpeedSampleStarted).TotalMilliseconds>=0
+            &&(BulletSpeedCached?IsFresh:Stopwatch.GetElapsedTime(BulletSpeedSampleStarted).TotalMilliseconds<=150);
         public ulong LocalController { get; init; }
         public int DetectedMap { get; init; } = -1;
         public long MapSampleStarted { get; init; }
@@ -123,16 +139,18 @@ public sealed partial class WardogReader(ulong moduleBase, WardogReader.ReadMemo
         public static Frame Empty(string status) => new(status, false, default, default, []);
     }
     public static bool Pointer(ulong p) => p >= 0x10000 && p < 0x0000800000000000;
-    private bool Read<T>(ulong address, out T value) where T : unmanaged
+    private void MarkReadOperation([CallerMemberName] string caller = "") => readOperation?.Invoke(WardogReadOperations.FromCaller(caller));
+    private bool Read<T>(ulong address, out T value, [CallerMemberName] string caller = "") where T : unmanaged
     {
         value = default;
         if (!Pointer(address)) return false;
+        MarkReadOperation(caller);
         Span<T> one = stackalloc T[1];
         if (!read(address, MemoryMarshal.AsBytes(one))) return false;
         value = one[0];
         return true;
     }
-    private ulong Ptr(ulong address) => Read(address, out ulong p) && Pointer(p) ? p : 0;
+    private ulong Ptr(ulong address, [CallerMemberName] string caller = "") => Read(address, out ulong p, caller) && Pointer(p) ? p : 0;
     private bool Array(ulong address, int max, out ulong[] pointers)
     {
         pointers = [];
@@ -140,6 +158,7 @@ public sealed partial class WardogReader(ulong moduleBase, WardogReader.ReadMemo
         if (a.Count == 0) return true;
         if (!Pointer(a.Data)) return false;
         pointers = new ulong[a.Count];
+        MarkReadOperation();
         if (read(a.Data, MemoryMarshal.AsBytes(pointers.AsSpan()))) return true;
         pointers = [];
         return false;
@@ -148,19 +167,22 @@ public sealed partial class WardogReader(ulong moduleBase, WardogReader.ReadMemo
     {
         if (!Read(address, out Arr a) || !Pointer(a.Data) || a.Count <= 0 || a.Count > 128 || a.Capacity < a.Count) return "";
         var bytes = new byte[a.Count*2];
+        MarkReadOperation();
         if (!read(a.Data, bytes)) return "";
         return Encoding.Unicode.GetString(bytes).Split('\0')[0];
     }
     private bool Position(ulong pawn, out Vec position)
         => Position(pawn, out position, out _, false);
-    private bool Position(ulong pawn, out Vec position, out double? facingYaw, bool readFacing)
+    private bool Position(ulong pawn, out Vec position, out double? facingYaw, bool readFacing,Vec? facingOrigin=null)
     {
         position = default;
         facingYaw = null;
         ulong root = Ptr(pawn+O.ActorRootComponent);
         if (root == 0) return false;
         foreach (ulong offset in new ulong[] { 0x210, 0x1D0, 0x1E0 })
-            if (Read(root+offset, out Transform t) && t.Valid())
+        {
+            bool validTransform=Read(root+offset, out Transform t) && t.Valid();
+            if (validTransform)
             {
                 position = t.Translation;
                 if (readFacing)
@@ -171,9 +193,12 @@ public sealed partial class WardogReader(ulong moduleBase, WardogReader.ReadMemo
                 }
                 return true;
             }
-        if (readFacing && Read(root+O.SceneRelativeRotation,out Vec rotation) && rotation.Valid(36001))
+        }
+        bool valid=Read(root+O.SceneRelativeLocation, out position) && position.Valid();
+        if (valid&&readFacing&&(facingOrigin==null||WardogReadRange.Contains(position,facingOrigin.Value))
+            &&Read(root+O.SceneRelativeRotation,out Vec rotation)&&rotation.Valid(36001))
             facingYaw=(rotation.Y%360+360)%360;
-        return Read(root+O.SceneRelativeLocation, out position) && position.Valid();
+        return valid;
     }
     private ulong Controller(ulong world)
     {
@@ -192,6 +217,7 @@ public sealed partial class WardogReader(ulong moduleBase, WardogReader.ReadMemo
         Span<byte> bytes = stackalloc byte[0x60];
         foreach (ulong offset in new ulong[] { O.CurrentCameraCache, 0x1E40, 0x350, 0xC40 })
         {
+            MarkReadOperation();
             if (!read(manager+offset, bytes)) continue;
             Vec location = MemoryMarshal.Read<Vec>(bytes[0x10..]);
             Vec rotation = MemoryMarshal.Read<Vec>(bytes[0x28..]);
@@ -313,10 +339,14 @@ public sealed partial class WardogReader(ulong moduleBase, WardogReader.ReadMemo
         }
         ulong playerClass = _playerClass;
         if (playerClass == 0) return Frame.Empty("Player class unavailable; check game build");
+        _focusedPlayerReads = optimizedReads || settings?.ShowTeammates == false;
         if (prefetch != null)
+            PrefetchPlayerLinks(states);
+        if (prefetch != null && !_focusedPlayerReads)
         {
-            prefetch(states.Where(Pointer).Select(ps => new WardogFrameMemory.Range(ps, 0x600)));
-            var actors = states.Where(Pointer).Select(ps => (State: ps, Actor: Ptr(ps+O.PlayerStatePawn))).Where(p => Pointer(p.Actor)).ToArray();
+            var actors = states.Where(Pointer).Select(ps => (State: ps, Actor: Ptr(ps+O.PlayerStatePawn)))
+                .Where(p => Pointer(p.Actor)&&Position(p.Actor,out var position)&&WardogReadRange.Contains(position,local)).ToArray();
+            prefetch(actors.Select(p => new WardogFrameMemory.Range(p.State, 0x600)));
             prefetch(actors.Select(p => new WardogFrameMemory.Range(p.Actor, 0x900)));
             var ranges = new List<WardogFrameMemory.Range>();
             ulong manager = Ptr(controller + O.CameraManager);
@@ -366,7 +396,8 @@ public sealed partial class WardogReader(ulong moduleBase, WardogReader.ReadMemo
             identities.Add(key);
             if (!_metadata.TryGetValue(key, out var info) || info.Class != type)
                 _metadata[key] = info = new Metadata { Class = type, NextLabel = _now, NextTeam = _now, NextHealth = _now };
-            if (!Position(actor, out Vec position, out double? facingYaw, radar?.WebSharing == true || (radar?.Enabled==true&&radar.LocalMap&&radar.Players))) { info.Body = SkeletonPose.Empty; continue; }
+            if (!Position(actor, out Vec position, out double? facingYaw, radar?.WebSharing == true || (radar?.Enabled==true&&radar.LocalMap&&radar.Players),facingOrigin:local)) { info.Body = SkeletonPose.Empty; continue; }
+            if(!WardogReadRange.Contains(position,local)){_metadata.Remove(key);continue;}
             if (radar?.Enabled == true && position.Distance(local)/100 <= radar.Range)
             {
                 if (_now >= info.NextTeam && _teamBudget > 0)
@@ -521,6 +552,7 @@ public sealed partial class WardogReader(ulong moduleBase, WardogReader.ReadMemo
             {
                 string tag=DisplayObjectName(itemId);
                 Span<byte> check=stackalloc byte[8];var fresh=readFresh??read;
+                readOperation?.Invoke(WardogReadOperation.RcsGuard);
                 if(fresh(controller+pawnOffset,check)&&MemoryMarshal.Read<ulong>(check)==pawn
                     &&fresh(pawn+O.PlayerInventory,check)&&MemoryMarshal.Read<ulong>(check)==inv
                     &&fresh(inv+O.InventoryHeldItem,check)&&MemoryMarshal.Read<ulong>(check)==held
@@ -530,9 +562,10 @@ public sealed partial class WardogReader(ulong moduleBase, WardogReader.ReadMemo
         }
         // Bypass the frame batch: a world switch during the scan must invalidate it.
         Span<byte> worldBytes = stackalloc byte[8];
+        readOperation?.Invoke(WardogReadOperation.WorldProof);
         if (!(readFresh ?? read)(moduleBase+O.GWorld, worldBytes) || MemoryMarshal.Read<ulong>(worldBytes) != world)
             return Frame.Empty("World changed; refreshing");
-        return new(cameraValid ? "Connected" : "Connected; camera unavailable", true, camera, local, players.ToArray()) { LocalFaction = localTeam.DisplayName, LocalRcsWeapon = rcsWeapon, LocalBulletSpeed = predictionSpeed.Speed, BulletSpeedSampleStarted = predictionSpeed.Stamp, MapDebug = _mapDebug, DetectedMap = _detectedMap, MapSampleStarted = _mapSampleStarted, RadarPlayers = radarPlayers.ToArray(), WebRadarPlayers=webPlayers.ToArray(), WorldAddress = world, LocalPawn = pawn, LocalController = controller, PoseFailures = poseFailures, PoseFallbacks = poseFallbacks };
+        return new(cameraValid ? "Connected" : "Connected; camera unavailable", true, camera, local, players.ToArray()) { LocalFaction = localTeam.DisplayName, LocalRcsWeapon = rcsWeapon, LocalBulletSpeed = predictionSpeed.Speed, BulletSpeedSampleStarted = predictionSpeed.Stamp, BulletSpeedCached=predictionSpeed.Cached, PredictionSpeedReadStatus=predictionSpeed.Status, MapDebug = _mapDebug, DetectedMap = _detectedMap, MapSampleStarted = _mapSampleStarted, RadarPlayers = radarPlayers.ToArray(), WebRadarPlayers=webPlayers.ToArray(), WorldAddress = world, LocalPawn = pawn, LocalController = controller, PoseFailures = poseFailures, PoseFallbacks = poseFallbacks };
     }
     private string ReadCurrentItem(ulong pawn)
     {
