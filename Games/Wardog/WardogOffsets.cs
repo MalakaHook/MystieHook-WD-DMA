@@ -44,6 +44,9 @@ public static class WardogOffsets
     public const ulong PlayerStateFactionComponent = 0x5A0; // 2026-10-15 raw SDK: WDPlayerStateSession.FactionComponent.
     public const ulong VitalityComponent = 0x748; // 2026-10-15 raw SDK: WDMoverCharacter.VitalityComponent.
     public const ulong BleedoutState = 0x810;
+    // Aligned with the working main Wardog layout (October 17).
+    public const ulong VehicleSeatComponent = 0x758;
+    public const ulong VehicleOperatorComponent = 0x768;
     public const ulong VehiclePlayerState = 0x890; // ABHBaseVehiclePawn: APlayerState*.
     public const ulong StationaryVehicleFactionComponent = 0x0B18;
     public const ulong AirplaneVehicleFactionComponent = 0x0BF8;

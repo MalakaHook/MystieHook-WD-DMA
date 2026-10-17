@@ -52,6 +52,7 @@ namespace MystieHook.Input
         private static SerialPort port = null;
         private static Thread button_inputs;
         public static string version = "";
+        public static string LastConnectionError {get;private set;}="";
         private static volatile bool runReader = false;
 
         public static Dictionary<int, bool> bState { get; private set; }
@@ -76,21 +77,22 @@ namespace MystieHook.Input
         /// Connect to a Makcu device by partial or exact friendly name (or "COM7").
         /// Validates the "km.MAKCU" signature before returning true.
         /// </summary>
-        public static bool MakcuConnect(string deviceNameOrCom)
+        public static bool MakcuConnect(string deviceNameOrCom, bool customFirmware=false)
         {
             try
             {
                 string com = ResolveComFromNameOrPort(deviceNameOrCom);
                 if (string.IsNullOrEmpty(com))
                 {
-                    Console.WriteLine($"[-] No COM port found for '{deviceNameOrCom}'.");
+                    LastConnectionError=$"No COM port found for '{deviceNameOrCom}'.";
+                    Console.WriteLine("[-] "+LastConnectionError);
                     return false;
                 }
 
-                Connect(com);
+                Connect(com, customFirmware);
                 if (!connected)
                 {
-                    Console.WriteLine("[-] Failed to open Makcu serial port.");
+                    Console.WriteLine("[-] Makcu connection failed: "+LastConnectionError);
                     return false;
                 }
 
@@ -124,7 +126,7 @@ namespace MystieHook.Input
                 Connect(com);
                 if (!connected)
                 {
-                    Console.WriteLine("[-] Failed to open Makcu serial port.");
+                    Console.WriteLine("[-] Makcu connection failed: "+LastConnectionError);
                     return false;
                 }
 
@@ -373,11 +375,13 @@ namespace MystieHook.Input
         // Connect / Disconnect / Reconnect
         // =====================================================================
 
-        public static void Connect(string com)
+        public static void Connect(string com, bool customFirmware=false)
         {
             lock (connectionLock)
             {
                 Disconnect();
+                LastConnectionError="";
+                string stage="opening the serial port";
                 try
                 {
                     port = new SerialPort(com, DEFAULT_OPEN_BAUD, Parity.None, 8, StopBits.One)
@@ -389,29 +393,37 @@ namespace MystieHook.Input
                     };
                     port.Open();
                     Thread.Sleep(150);
+                    stage="switching to high-speed mode";
                     port.Write(change_cmd, 0, change_cmd.Length);
                     port.BaseStream.Flush();
                     // Match the working driver: reopen after the device changes baud.
                     port.Close();
                     Thread.Sleep(50);
                     port.BaudRate = HIGH_BAUD;
+                    stage="reopening the serial port at high speed";
                     port.Open();
+                    stage="configuring the device commands";
                     port.Write("km.buttons(0)\r\n");
                     port.Write("km.echo(0)\r\n");
                     Thread.Sleep(50);
+                    stage="checking the firmware version";
+                    // Custom mode is explicit/manual only; automatic detection remains verified.
+                    if(customFirmware)version="Custom firmware (version check skipped)";
                     // This is the only serial reader until the handshake completes.
-                    if (!ValidateMakcuSignature())
+                    if (!customFirmware && !ValidateMakcuSignature())
                         throw new InvalidOperationException("Makcu version handshake timed out or returned an unexpected signature.");
+                    stage="starting button input";
                     port.DiscardInBuffer();
                     port.Write("km.buttons(1)\r\n");
                     connected = true;
                     start_listening();
-                    Console.WriteLine($"[+] Device verified on {com} at {HIGH_BAUD} baud.");
+                    Console.WriteLine($"[+] Device connected on {com} at {HIGH_BAUD} baud; custom firmware mode={customFirmware}.");
                 }
                 catch (Exception ex)
                 {
                     Disconnect();
-                    Console.WriteLine($"[-] Device failed to connect: {ex.Message}");
+                    LastConnectionError=$"{com}: failed while {stage}: {ex.Message}";
+                    Console.WriteLine("[-] "+LastConnectionError);
                 }
             }
         }

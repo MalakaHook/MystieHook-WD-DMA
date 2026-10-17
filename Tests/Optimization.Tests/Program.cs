@@ -14,6 +14,7 @@ FeatureColorAutosaveChecks.Run(Check,Path.Combine(AppContext.BaseDirectory,"foll
 ReadOptimizationChecks.Run(Check);
 HiddenTeammateChecks.Run(Check);
 ReadRangeChecks.Run(Check);
+VehicleTeammateChecks.Run(Check);
 ReadRangeUiChecks.Run(Check);
 PipelineChecks.Run(Check);
 

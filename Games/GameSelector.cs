@@ -26,6 +26,7 @@ namespace MystieHook.Games
     // ---------------------------------------------------------------------
     public static partial class GameSelector
     {
+        private static bool _customMakcuFirmware;
         // Global flags
         public static bool VmmInnit { get; private set; }
         public static bool AttachedToProccess { get; private set; }
@@ -667,14 +668,17 @@ namespace MystieHook.Games
             ImGui.Separator();
             ImGui.TextDisabled("Makcu Device");
 
+            ImGui.Checkbox("Custom MAKCU firmware (skip version check)",ref _customMakcuFirmware);
+            if(_customMakcuFirmware)ImGui.TextWrapped("Use only with your selected MAKCU-compatible device. Standard serial commands and the high-speed connection are still required.");
             if (ImGui.Button("Connect Makcu"))
             {
                 if (_selectedInputIndex >= 0 && _selectedInputIndex < _inputDevices.Count)
                 {
                     var dev = _inputDevices[_selectedInputIndex];
+                    bool customFirmware=_customMakcuFirmware;
                     JobSystem.Schedule(() =>
                     {
-                        if (Input.Device.MakcuConnect(dev.Port))
+                        if (Input.Device.MakcuConnect(dev.Port,customFirmware))
                             Console.WriteLine($"[+] Makcu connected on {dev.Port}");
                         else
                             Console.WriteLine("[-] Makcu connect failed");
@@ -719,6 +723,11 @@ namespace MystieHook.Games
 
             ImGui.Separator();
             DrawStatusLight("Makcu Connected", Input.Device.connected);
+            if(!Input.Device.connected&&!string.IsNullOrWhiteSpace(Input.Device.LastConnectionError))
+            {
+                MystieHook.Gui.SafeText.Wrapped(Input.Device.LastConnectionError);
+                if(ImGui.Button("Copy Makcu connection error"))ImGui.SetClipboardText(Input.Device.LastConnectionError);
+            }
             string firmware=Input.Device.GetVersion();
             MystieHook.Gui.SafeText.Wrapped(string.IsNullOrWhiteSpace(firmware)
                 ? "Makcu firmware: unavailable. Connect Makcu to read its version."

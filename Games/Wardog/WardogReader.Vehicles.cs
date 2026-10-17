@@ -91,10 +91,10 @@ public sealed partial class WardogReader
         // vehicle itself. Both are positive occupancy evidence, not ownership.
         ulong seat;
         if (_vehicleActors.TryGetValue(pawn, out ulong type) && Ptr(pawn + O.UObjectClass) == type)
-            seat = Ptr(pawn + 0x748);
+            seat = Ptr(pawn + O.VehicleSeatComponent);
         else
         {
-            ulong component = Ptr(pawn + 0x758);
+            ulong component = Ptr(pawn + O.VehicleOperatorComponent);
             if (component == 0 || !NamedObject(component, "BHVehicleOperatorComponent")) return 0;
             seat = Ptr(component + 0x198);
         }
@@ -225,7 +225,7 @@ public sealed partial class WardogReader
             var relation=Relation.Unknown;
             if (!settings.ShowTeammateVehicles || settings.CaptureTeams)
             {
-                ulong seat = Ptr(actor + 0x748);
+                ulong seat = Ptr(actor + O.VehicleSeatComponent);
                 if (seat != 0 && _occupants.Values.Any(o => o.Seat == seat && o.Friendly && _now - o.ReadAt <= 2000)) relation=Relation.Friendly;
                 if(!settings.ShowTeammateVehicles && relation==Relation.Friendly)continue;
             }
