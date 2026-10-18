@@ -1,0 +1,20 @@
+[
+  {
+    "Repository": "MemProcFS",
+    "Tag": "v5.19",
+    "Name": "MemProcFS_files_and_binaries_v5.19.0-win_x64-20261014.zip",
+    "URL": "https://github.com/ufrisk/MemProcFS/releases/download/v5.19/MemProcFS_files_and_binaries_v5.19.0-win_x64-20261014.zip",
+    "SHA256": "5DC42673F35371E309B2C3F5C302556489897451A90905061035B630239D3CA9",
+    "OfficialDigest": "sha256:5dc42673f35371e309b2c3f5c302556489897451a90905061035b630239d3ca9",
+    "Extracted": "F:\\work\\WARDOG\\artifacts\\Archive\\native-library-sources-20261017\\MemProcFS"
+  },
+  {
+    "Repository": "LeechCore",
+    "Tag": "v2.23",
+    "Name": "LeechCore_files_and_binaries_v2.23.4-win_x64-20261005.zip",
+    "URL": "https://github.com/ufrisk/LeechCore/releases/download/v2.23/LeechCore_files_and_binaries_v2.23.4-win_x64-20261005.zip",
+    "SHA256": "22509D980434A95663657F07E3663BC7F161F89F7532A455E0B7766F28DADE23",
+    "OfficialDigest": "sha256:22509d980434a95663657f07e3663bc7f161f89f7532a455e0b7766f28dade23",
+    "Extracted": "F:\\work\\WARDOG\\artifacts\\Archive\\native-library-sources-20261017\\LeechCore"
+  }
+]
